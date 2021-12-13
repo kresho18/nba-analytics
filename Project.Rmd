@@ -1,0 +1,244 @@
+---
+title: "NBA Analytics"
+author: "Nedeljko Boskovic"
+date: "6/15/2021"
+output:  
+    html_document: 
+      toc: true
+      toc_float: true
+bibliography: bibliography.bib
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+library(tidyverse)
+df <- read.csv("nba.games.stats.csv")
+```
+
+
+# Introduction
+
+In this analysis we will work with the NBA Team Game Stats from the 2014 to 2018 dataset and analyze some of the key factors that are important in wins and losses. Dataset has been obtained among [kaggle](https://www.kaggle.com/ionaskel/nba-games-stats-from-2014-to-2018) datasets.
+
+# Presentation and description of the problem
+
+Since we have an extensive amount of statistics from each NBA game in the period of years between 2014 to 2018, we can look further and find the correlation between some of the statistic categories which impact the game. According to [@Toth:2019], some of the important analytics are calculated using such data and is also a great way of predicting win/lose ratio of the teams, and for betting odds as well. The plan is to compare some of these analytics :
+
+* Home court advantage
+* Offensive rebound percentage per game
+* Difference between scores
+* 3 point attempts per team
+
+# Presentation of the data
+
+Since we have the data from the period of 2014 to 2018, there are 9840 rows that contain every possible statistic of both the Team and the Opponent. That means that it contains 41 columns.
+
+```{r}
+dim(df)
+str(df)
+```
+
+We have Team column which contains 30 teams, Game which represents which game of the season it is (82 games in a season), Date, Home or Away column, Opponent Team, whether it is a win or loss, and the rest is the percentages and statistics from a particular game.
+
+```{r}
+unique(df$Team)
+```
+
+# Exploratory data analysis
+
+In this section, we will talk more about some of the columns from the data frame and find the distributions, frequencies, and statistics that are important in exploratory data analysis. Since there are many columns, with the help of the [@Wikipedia:2021], we are going to take a few examples for each data type and find some of the most important aspects when it comes to data analysis.
+
+## Home and Away games
+
+Firstly, we will look into the Home or Away nominal data type values and find the frequencies of home and away games that are played. We could also take the frequencies of the games played for the same team, but since this is only the regular season games, we would have an equal amount of games for each team.
+
+
+```{r}
+ggplot(df) +
+  geom_bar(aes(x=Home), width = 0.35,fill="orange") +
+  xlab("Home or Away")+
+  theme_minimal()
+```
+
+### Result
+
+From the diagram, we can see that in the dataset there are an equal amount of Home and Away games played.
+
+### Comparing two teams, GSW vs. LAL
+
+On the other hand, we can compare what were the win or loss statistics in the span of these games. We will take Golden State Warriors and Los Angeles Lakers for example.
+
+```{r}
+Wins <- df %>%
+  select(Team, WINorLOSS) %>% 
+  dplyr::filter(Team=="GSW") %>%
+  rbind(
+    df %>%
+      select(Team, WINorLOSS) %>%
+      dplyr::filter(Team=="LAL")
+  )
+
+ggplot(Wins) +
+  geom_bar(aes(x=WINorLOSS), width = 0.3, fill="yellow") +
+  facet_grid(. ~Team) +
+  theme_minimal()
+```
+
+#### Results
+
+In these diagrams, it is clear that Golden State Warriors had a few great regular seasons, while Los Angeles Lakers probably did not manage to compete further in play-offs. We could also calculate the win/lose percentage for these teams : 
+
+```{r}
+WinsGSW <- df %>%
+  dplyr::filter(Team=="GSW")
+
+WinsGSW %>%
+  dplyr::filter(WINorLOSS=="W") %>%
+  summarise(WinPercentage=n()/dim(WinsGSW)[1] * 100) %>%
+  cbind(
+    WinsGSW %>% 
+      dplyr::filter(WINorLOSS=="L") %>%
+      summarise(LosePercentage=n()/dim(WinsGSW)[1] * 100)
+  )
+```
+
+```{r}
+WinsLAL <- df %>%
+  dplyr::filter(Team=="LAL")
+
+WinsLAL %>%
+  dplyr::filter(WINorLOSS=="W") %>%
+  summarise(WinPercentage=n()/dim(WinsLAL)[1] * 100) %>%
+  cbind(
+    WinsLAL %>% 
+      dplyr::filter(WINorLOSS=="L") %>%
+      summarise(LosePercentage=n()/dim(WinsLAL)[1] * 100)
+  )
+```
+
+
+## Win or Loss impacts
+
+In the process of getting the visualization of correlation between continous and categorical data we will use *boxplot*. For the  data we will present the Assists and Turnovers of the teams that played on the home court, we will show what are the min, max, median and mean values of Assists and Turnovers by one team in the game. We can expect that the correlation between the quantity of Assists and Wins, and between the Turnovers and Losses.
+
+```{r}
+ggplot(df) +
+  geom_boxplot(aes(x=WINorLOSS,y=Assists), fill="yellow") +
+  theme_minimal()
+
+ggplot(df) +
+  geom_boxplot(aes(x=WINorLOSS,y=Turnovers), fill="red") +
+  theme_minimal()
+```
+
+### Results
+
+As we have expected, Assists have a great impact on whether the game will be won, and on the boxplot we can see what are the minimum, maximum, median of assists in games and how they impact the outcome of the game. The same goes for Turnovers, but they impact the losses since it represents the times the team lost the possession.
+
+## Correlation between Team points and Field goals 
+
+For the two continuous data types, we will show the correlation between the points that are scored by home team and the field goals column.
+
+```{r}
+model <- lm(df$TeamPoints~df$FieldGoals)
+
+ggplot() +
+  geom_point(data = df, aes(x=TeamPoints,y=FieldGoals)) +
+  geom_smooth(method = lm, data = df, aes(x=TeamPoints,y=FieldGoals)) +
+  theme_minimal()
+```
+
+### Results
+
+On this scatterplot, we can see how the field goals scored impact the total points of the team and the overall outcome. Apart from field goals we also have to take free throws into consideration as the games with a lot of fouls can be a great impact on the game. 
+
+# Visualization of the data
+
+## Home court advantage
+
+In this section, we are going to focus on the quantity of the games that are won by the teams, on the home or away court.
+
+```{r, fig.width=18, fig.height=8}
+HomeWins <- df %>%
+  dplyr::filter(WINorLOSS=="W")
+
+ggplot(HomeWins) +
+  geom_bar(aes(x=Team, fill=Home), position = position_dodge(preserve = 'single')) +
+  theme_minimal(base_size = 19)
+```
+
+
+### Results
+
+Usually, home-court advantage is considered a big factor in winning games. Even though a lot of teams can surprise and lose at the home arena, it is more probable that the home team will win the game. From the graph, we can see that no team has succeeded to have more wins at away games than at home games in the period of 2014-2018. Some of the teams were closer than the others, for instance, Sacramento Kings, but there are also teams that are winning much more games at home court, for instance, Oklahoma City Thunder.
+
+## Offensive rebound percentage
+
+Offensive rebound is a term when a team gathers a possession even after a missed field goal. The aim is to find each teams' percentage of offensive rebounds per game.
+
+```{r, fig.width=18, fig.height=8}
+OffReboundsPerc <- df %>%
+  mutate(FieldGoalsMissed=FieldGoalsAttempted-FieldGoals) %>%
+  select(Team, FieldGoalsMissed, OffRebounds) %>%
+  mutate(OffReboundsPercentage=OffRebounds/FieldGoalsMissed) %>%
+  group_by(Team) %>%
+  summarise(OffReboundsPercentagePerGame=mean(OffReboundsPercentage)) %>%
+  arrange(desc(OffReboundsPercentagePerGame))
+  
+
+ggplot(OffReboundsPerc) +
+  geom_point(aes(x=Team,y=OffReboundsPercentagePerGame), size=3.5) +
+  theme_minimal(base_size = 19)
+```
+
+
+### Result
+
+For offensive rebound percentage, we had to first calculate how many missed shots we have, then find the ratio between Offensive rebounds and Missed shots. As a result, we hot the Offensive Rebound percentage per game, and the winner by far was Oklahoma City Thunder with almost 27 \% of offensive rebounds after a missed shot, and the Dallas Mavericks as a team with least offensive rebounds per game with 19 \%.
+
+## Difference between scores
+
+This analysis is just the frequency of the differences between the score of the winning and the opposing team.
+
+```{r}
+Blowout <- df %>%
+  select(Team, Opponent, TeamPoints, OpponentPoints, WINorLOSS) %>%
+  dplyr::filter(WINorLOSS == "W") %>%
+  mutate(Difference = TeamPoints-OpponentPoints)
+
+ggplot(Blowout) +
+  geom_bar(aes(Difference)) +
+  scale_x_continuous(breaks = c(0,5,10,20,30,40,50,60)) +
+  theme_minimal()
+```
+
+### Results
+
+In the diagram above, we can see the frequencies of final score differences, with 7 being the most frequent, and 61 being the biggest difference between scores which is at the same time the 6th greatest difference in NBA history, and it was between Charlotte Hornets and Memphis Grizzlies.
+
+## Three points attempts per game
+
+```{r, fig.width=12, fig.height=6}
+ThreePointShots <- df %>%
+  group_by(Team) %>%
+  summarise(ThreePointShotsTaken = mean(X3PointShotsAttempted)) %>%
+  arrange(desc(ThreePointShotsTaken))
+
+ggplot(ThreePointShots) +
+  geom_point(mapping=aes(x=Team, y=ThreePointShotsTaken), size=3.5)+
+  theme_minimal(base_size = 14)
+```
+
+
+### Results
+
+This diagram shows what is the average three-point attempts per game for each team. As the result, we can see Houston Rockets being the leaders and Minnesota Timberwolves as the team with the least three-point attempts per game.
+
+
+# Conclusion
+
+In conclusion, we can see how some of these statistics impact the game score, and we have succeeded to show how home games are much more likely to be won, what are the usual differences in scores, and the amount of three-point shots that are taken by each team. Since this is a large dataset, we can perform a lot of other analytics, but what would be even more interesting is to have the data for the statistics from a certain player in the team. However, we can leave that for another time. 
+
+# References
+
+
